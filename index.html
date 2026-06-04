@@ -82,8 +82,7 @@ function App(){
   const [coinAnim,setCoinAnim]=useState('idle');
   const [currentCoins,setCurrentCoins]=useState(null);
   const [showTossResult,setShowTossResult]=useState(false);
-  const [interpretation,setInterpretation]=useState('');
-  const [interpreting,setInterpreting]=useState(false);
+  
   const [revealStep,setRevealStep]=useState(0);
   const timerRef=useRef(null);
 
@@ -118,7 +117,7 @@ function App(){
     setTossIndex(tossIndex+1);setCoinAnim('idle');setCurrentCoins(null);setShowTossResult(false);
   };
 
-  const reset=()=>{setPhase('welcome');setQuestion('');setTossIndex(0);setTosses([]);setCoinAnim('idle');setCurrentCoins(null);setShowTossResult(false);setInterpretation('');setInterpreting(false);setRevealStep(0);};
+  const reset=()=>{setPhase('welcome');setQuestion('');setTossIndex(0);setTosses([]);setCoinAnim('idle');setCurrentCoins(null);setShowTossResult(false);setRevealStep(0);};
 
   const lines=tosses.map(t=>t.value),changingLines=tosses.map(t=>t.changing);
   const hasChanging=changingLines.some(Boolean);
@@ -127,33 +126,7 @@ function App(){
   let changedHexNum=null,changedHexData=null;
   if(hasChanging&&lines.length===6){const cl=lines.map((v,i)=>changingLines[i]?(v===1?0:1):v);changedHexNum=getHexNumber(cl);changedHexData=HEXAGRAMS[changedHexNum];}
 
-  useEffect(()=>{
-    if(phase!=='reading'||!hexData)return;
-    setInterpreting(true);
-    const cc=changingLines.filter(Boolean).length;
-    const ci=changingLines.map((c,i)=>c?i:-1).filter(i=>i>=0);
-    const yn=(v,i)=>{const y=v===1?'九':'六';if(i===0)return`初${y}`;if(i===5)return`上${y}`;return`${y}${YAO_NAMES[i]}`};
-    let p=`你是一位温厚而有格调的周易解卦师，用通俗易懂但有文化感的语言解卦，像儒雅长者喝茶聊天。求问：${question||'未明确说明'}。本卦：${hexData.title}（第${hexNum}卦），卦辞：${hexData.gua}。`;
-    if(cc>0){p+=`动爻：`;ci.forEach(i=>{p+=`${yn(lines[i],i)}：${hexData.yao[i]} `});if(changedHexData)p+=`变卦：${changedHexData.title}，卦辞：${changedHexData.gua}。`}
-    else{p+=`无动爻，以本卦卦辞为主断。`}
-    p+=` 请按【卦旨】【卦象解读】【动爻玄机】【行事指引】【断语】五部分回答，不要用分隔线。`;
-    (async()=>{
-      try{
-        const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,messages:[{role:"user",content:p}]})});
-        const d=await r.json();
-        setInterpretation(d.content?.map(b=>b.text||'').join('\n')||'');
-      }catch(e){
-        // Fallback: local interpretation
-        let t=`【卦旨】\n得「${hexData.title}」，${hexData.gua}\n\n【卦象解读】\n${hexData.title}，第${hexNum}卦。`;
-        if(cc>0){t+=`\n\n【动爻玄机】\n`;ci.forEach(i=>{t+=`${yn(lines[i],i)}：${hexData.yao[i]}\n`});}
-        else{t+=`\n\n【动爻玄机】\n六爻皆静，卦象安定，以本卦卦辞为凭。`}
-        if(changedHexData)t+=`\n变卦为${changedHexData.title}：${changedHexData.gua}`;
-        t+=`\n\n【行事指引】\n静观其变，顺势而为，守正待时。\n\n【断语】\n此卦${hexData.gua}心诚则灵，审时度势，可得其宜。`;
-        setInterpretation(t);
-      }
-      setInterpreting(false);
-    })();
-  },[phase]);
+
 
   function getNarration(toss){
     if(toss.sum===6)return{desc:'三枚皆为字面，得老阴——此爻为阴，且为动爻，将有变化。',hl:true};
@@ -313,55 +286,28 @@ function App(){
               {question&&<div style={{marginTop:16,paddingTop:16,borderTop:'1px solid rgba(201,168,76,0.1)',fontSize:14,color:'#8a7f72'}}>所问：<span style={{color:'#b0a898'}}>{question}</span></div>}
             </div>
             <div style={card}>
-              <div style={{fontFamily:FH,fontSize:15,color:'#c9a84c',marginBottom:20,letterSpacing:4,display:'flex',alignItems:'center',gap:8}}>
-                <span>📜</span> 解卦
+              <div style={{fontFamily:FH,fontSize:15,color:'#c9a84c',marginBottom:16,letterSpacing:4,display:'flex',alignItems:'center',gap:8}}>
+                <span>📜</span> 卦辞
               </div>
-              {interpreting?(
-                <div style={{textAlign:'center',padding:'40px 0'}}>
-                  <div style={{width:40,height:40,border:'2px solid rgba(201,168,76,0.2)',borderTop:'2px solid #c9a84c',borderRadius:'50%',margin:'0 auto 16px',animation:'spin 1s linear infinite'}}/>
-                  <div style={{fontFamily:FH,fontSize:15,color:'#e8d48b',animation:'typing 2s ease-in-out infinite'}}>正在解卦……</div>
-                </div>
-              ):(
-                <div style={{fontSize:15,color:'#d4cdc2',lineHeight:2}}>
-                  {interpretation.replace(/^[\s\n]*---[\s\n]*/gm,'').replace(/\n{3,}/g,'\n\n').split(/(?=【)/g).map((sec,i)=>{
-                    const m=sec.match(/^【(.+?)】\n?([\s\S]*)/);
-                    if(!m)return sec.trim()?<span key={i}>{sec.trim()}</span>:null;
-                    return(
-                      <div key={i} style={{marginBottom:24}}>
-                        <div style={{fontFamily:FH,fontSize:15,color:'#c9a84c',marginBottom:10,fontWeight:700,borderLeft:'3px solid #c9a84c',paddingLeft:12}}>{m[1]}</div>
-                        <div style={{paddingLeft:15,color:'#c8c0b4',lineHeight:2,whiteSpace:'pre-wrap'}}>{m[2].trim()}</div>
-                      </div>
-                    );
-                  })}
+              <div style={{fontSize:15,color:'#b0a898',lineHeight:2,marginBottom:20}}>{hexData.gua}</div>
+              <div style={{fontFamily:FH,fontSize:15,color:'#c9a84c',marginBottom:12,letterSpacing:4}}>爻辞</div>
+              {hexData.yao.map((y,i)=>{
+                const yy=lines[i]===1?'九':'六';
+                const pos=i===0?`初${yy}`:i===5?`上${yy}`:`${yy}${YAO_NAMES[i]}`;
+                return(
+                  <div key={i} style={{padding:'10px 14px',borderRadius:8,marginBottom:6,background:changingLines[i]?'rgba(212,92,92,0.08)':'rgba(255,255,255,0.02)',borderLeft:changingLines[i]?'3px solid #d45c5c':'3px solid transparent'}}>
+                    <span style={{fontFamily:FH,fontSize:13,color:changingLines[i]?'#d45c5c':'#c9a84c',fontWeight:700,marginRight:8}}>{pos}{changingLines[i]?' 动':''}</span>
+                    <span style={{fontSize:13,color:'#9a9080'}}>{y}</span>
+                  </div>
+                );
+              })}
+              {changedHexData&&(
+                <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid rgba(201,168,76,0.1)'}}>
+                  <div style={{fontFamily:FH,fontSize:14,color:'#d45c5c',marginBottom:8}}>变卦：{changedHexData.title}</div>
+                  <div style={{fontSize:13,color:'#9a9080',lineHeight:1.8}}>{changedHexData.gua}</div>
                 </div>
               )}
             </div>
-            <details style={{marginBottom:20}}>
-              <summary style={{fontFamily:FH,fontSize:14,color:'#8a7f72',cursor:'pointer',padding:'16px 24px',background:'rgba(26,23,20,0.6)',border:'1px solid rgba(201,168,76,0.1)',borderRadius:12,display:'flex',alignItems:'center',gap:8}}>
-                <span>▸</span> 查看原文卦辞与爻辞
-              </summary>
-              <div style={{background:'rgba(26,23,20,0.8)',border:'1px solid rgba(201,168,76,0.1)',borderTop:'none',borderRadius:'0 0 12px 12px',padding:'20px 24px'}}>
-                <div style={{fontFamily:FH,fontSize:14,color:'#e8d48b',marginBottom:12}}>{hexData.title} · 卦辞</div>
-                <div style={{fontSize:14,color:'#b0a898',lineHeight:2,marginBottom:16}}>{hexData.gua}</div>
-                <div style={{fontFamily:FH,fontSize:14,color:'#e8d48b',marginBottom:12}}>爻辞</div>
-                {hexData.yao.map((y,i)=>{
-                  const yy=lines[i]===1?'九':'六';
-                  const pos=i===0?`初${yy}`:i===5?`上${yy}`:`${yy}${YAO_NAMES[i]}`;
-                  return(
-                    <div key={i} style={{padding:'10px 14px',borderRadius:8,marginBottom:6,background:changingLines[i]?'rgba(212,92,92,0.08)':'rgba(255,255,255,0.02)',borderLeft:changingLines[i]?'3px solid #d45c5c':'3px solid transparent'}}>
-                      <span style={{fontFamily:FH,fontSize:13,color:changingLines[i]?'#d45c5c':'#c9a84c',fontWeight:700,marginRight:8}}>{pos}{changingLines[i]?' 动':''}</span>
-                      <span style={{fontSize:13,color:'#9a9080'}}>{y}</span>
-                    </div>
-                  );
-                })}
-                {changedHexData&&(
-                  <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid rgba(201,168,76,0.1)'}}>
-                    <div style={{fontFamily:FH,fontSize:14,color:'#d45c5c',marginBottom:8}}>变卦：{changedHexData.title}</div>
-                    <div style={{fontSize:13,color:'#9a9080',lineHeight:1.8}}>{changedHexData.gua}</div>
-                  </div>
-                )}
-              </div>
-            </details>
             <div style={{textAlign:'center',marginTop:28}}>
               <button className="gBtn" onClick={reset}>重新起卦</button>
             </div>
